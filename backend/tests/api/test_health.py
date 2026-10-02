@@ -1,9 +1,11 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 
-def test_health_reports_process_status() -> None:
+def test_health_reports_process_status(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://unused@localhost/unused")
     with TestClient(app) as client:
         response = client.get("/health")
 

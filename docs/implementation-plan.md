@@ -28,7 +28,7 @@ Next.js -> FastAPI routes -> EntryService
                               `-- PostgresUsageRepository -> PostgreSQL
 ```
 
-Repository structure (cache, migrations, and frontend are added in later stages):
+Repository structure (cache and frontend are added in later stages):
 
 ```text
 backend/
@@ -47,6 +47,7 @@ backend/
     adapters/
       scraper.py
       usage.py
+      database.py
       cache.py
   tests/
     conftest.py
@@ -60,6 +61,9 @@ backend/
     adapters/
       test_scraper.py
       test_scraper_live.py
+    integration/
+      conftest.py
+      test_usage.py
     test_service.py
   migrations/
 frontend/
@@ -181,7 +185,7 @@ Keep one repository and an executable `main`. Use short feature branches, cohere
 - [x] Stage 2 — Entry models and pure rules, with complete unit tests.
 - [x] Stage 3 — Scraper and saved HTML fixtures, including failure cases.
 - [x] Stage 4 — Service, entries HTTP endpoint, dependency assembly, and tests; verify the existing API container with the new dependencies. Uses an explicit logging-only usage recorder until Stage 5; successful responses do not yet imply durable persistence.
-- [ ] Stage 5 — PostgreSQL migration, repository, migration service, startup readiness gates, and integration tests using the existing database service.
+- [x] Stage 5 — PostgreSQL migration, repository, migration service, startup readiness gates, and integration tests using the existing database service.
 - [ ] Stage 6 — Cache wrapper and deterministic expiration/concurrency tests.
 - [ ] Stage 7 — Next.js interface, frontend container, integrated Compose startup, and browser tests.
 - [ ] Stage 8 — Clean-clone verification, measurements, complete architecture documentation, and release tag `v1.0.0`.

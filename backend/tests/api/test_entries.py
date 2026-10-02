@@ -21,7 +21,15 @@ from app.service import EntryService
 
 
 @pytest.fixture
-def client(source: FakeSource, recorder: FakeRecorder) -> Iterator[TestClient]:
+def configured_database(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Engine construction needs a URL; fake recorders never connect to this database.
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://unused@localhost/unused")
+
+
+@pytest.fixture
+def client(
+    source: FakeSource, recorder: FakeRecorder, configured_database: None
+) -> Iterator[TestClient]:
     app.dependency_overrides[get_entry_service] = lambda: EntryService(source, recorder)
     try:
         with TestClient(app) as client:
@@ -161,8 +169,9 @@ def test_concurrent_requests_have_independent_contexts_and_events(
     assert [r.json()["result_count"] for r in responses] == [4, 2, 2]
 
 
+@pytest.mark.usefixtures("configured_database")
 def test_lifespan_assembles_scraper_and_closes_shared_client(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    monkeypatch: pytest.MonkeyPatch, recorder: FakeRecorder
 ) -> None:
     html = (Path(__file__).parents[1] / "fixtures" / "front_page.html").read_text(
         encoding="utf-8"
@@ -175,6 +184,7 @@ def test_lifespan_assembles_scraper_and_closes_shared_client(
 
     upstream_client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
     monkeypatch.setattr("app.main.httpx.AsyncClient", lambda: upstream_client)
+    monkeypatch.setattr("app.main.PostgresUsageRepository", lambda sessions: recorder)
     with TestClient(app) as client:
         for _ in range(2):
             response = client.get("/api/v1/entries")
@@ -184,11 +194,5 @@ def test_lifespan_assembles_scraper_and_closes_shared_client(
         assert not upstream_client.is_closed
     assert upstream_client.is_closed
     assert len(requests) == 2
-    events = [
-        json.loads(r.message)
-        for r in caplog.records
-        if r.name == "app.adapters.usage"
-    ]
-    assert len(events) == 2
-    assert all(event["event"] == "usage_not_persisted" for event in events)
-    assert all(event["outcome"] == "success" for event in events)
+    assert len(recorder.events) == 2
+    assert all(event.outcome == "success" for event in recorder.events)

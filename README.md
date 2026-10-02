@@ -1,6 +1,6 @@
 # Hacker News Crawler
 
-An interview project for scraping and filtering the first 30 Hacker News front-page entries and recording API usage. This repository currently provides the FastAPI entries endpoint, filtering service, HTML scraper, and development PostgreSQL service. Stage 4 logs usage events; durable PostgreSQL recording is planned for Stage 5. Planned functionality is tracked in [the implementation plan](docs/implementation-plan.md).
+An interview project for scraping and filtering the first 30 Hacker News front-page entries and recording API usage. This repository provides the FastAPI entries endpoint, filtering service, HTML scraper, and durable PostgreSQL usage recording with Alembic migrations. Planned functionality is tracked in [the implementation plan](docs/implementation-plan.md).
 
 ## Requirements
 
@@ -11,7 +11,9 @@ The project uses Python 3.13 and uv 0.12.21. Dependencies are resolved in `backe
 
 ## Run with Docker
 
-From the repository root:
+From the repository root, copy `.env.example` to `.env` and set
+`POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` for your local database.
+Then run:
 
 ```sh
 docker compose up --build
@@ -19,20 +21,73 @@ docker compose up --build
 
 Open <http://127.0.0.1:8000/health>. The response is `{"status":"ok"}`. This endpoint confirms that the API process is responding; it does not test database readiness. PostgreSQL has a separate Compose health check. Its data persists in the named `postgres_data` volume.
 
-The development defaults work without a `.env` file. Copy `.env.example` to `.env` to change the password or host ports. The example password is for local development only. Stop the stack with `docker compose down`; add `--volumes` only when you intend to remove local database data.
+Compose waits for PostgreSQL to become healthy, runs the one-shot `migrate`
+service (`alembic upgrade head`), then starts the API only if migrations succeed.
+The migration container exiting with code 0 is expected. Application and migration
+containers run as a non-root user.
+
+Compose requires explicit database names, users, and passwords from `.env` or the
+shell; none has a fallback. `.env.example` contains local development examples and
+optional host ports. Single-quote `.env` passwords containing literal `$` or `#`.
+Changing these values in `.env` does not rename an existing database or user,
+or change its password; existing databases must also be updated in PostgreSQL.
+Stop the stack with
+`docker compose down`; add `--volumes` only when you intend to remove local data.
 
 ## Run the API locally
 
-Start PostgreSQL in Docker, then run the API with reload:
+After configuring `.env` as above, start PostgreSQL in Docker, configure the API,
+then run it with reload (POSIX shell; substitute your user, database, password,
+and host port):
 
 ```sh
 docker compose up -d db
 cd backend
 uv sync --locked
+export DATABASE_URL='postgresql+asyncpg://YOUR_USER@localhost:5433/YOUR_DATABASE'
+export DATABASE_PASSWORD='your configured POSTGRES_PASSWORD'
+uv run --locked alembic upgrade head
 uv run --locked uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 For local backend execution, PostgreSQL is available at `localhost:5433`; Compose services use `db:5432`. The health endpoint does not query PostgreSQL.
+
+In PowerShell, replace the `export` commands with:
+
+```powershell
+$env:DATABASE_URL = 'postgresql+asyncpg://YOUR_USER@localhost:5433/YOUR_DATABASE'
+$env:DATABASE_PASSWORD = 'your configured POSTGRES_PASSWORD'
+```
+
+Both the API and Alembic require `DATABASE_URL`; an unset or blank value stops
+startup with a configuration error. There is no application default URL or password.
+The URL must use `postgresql+asyncpg`. You can include a URL-encoded password in
+the URL, or set `DATABASE_PASSWORD` to a raw password; when set, it overrides the
+URL's password and must not be blank. SQLAlchemy constructs the connection URL
+without interpreting special characters in that separate password.
+`DATABASE_USER` and `DATABASE_NAME` likewise override URL fields when set and
+must not be blank. These separate settings accept raw values, including reserved
+URL characters. Compose passes the configured database name, user, and password
+separately; API and migration services share the same configuration.
+The root `.env` configures Compose; native Python commands do not load it.
+Apply migrations before starting a native API process. Database sessions are
+created per write, and the shared engine is disposed at application shutdown.
+
+### Migration files
+
+Keep `backend/alembic.ini` and the entire `backend/migrations/` source directory
+in version control: `env.py` runs migrations, `script.py.mako` is the template for
+new revisions, and `versions/` contains the schema history. These are source
+files, not database data. Do not commit `.env`, credentials, or Python caches.
+Alembic normally scaffolds this environment with `alembic init -t async migrations`;
+this repository's environment was written explicitly for its async setup and
+environment-based configuration. Do not rerun `init` for an existing checkout.
+
+For a future schema change, update the SQLAlchemy metadata, run
+`uv run --locked alembic revision --autogenerate -m "describe the schema change"`
+from `backend`, and review the generated `upgrade()` and `downgrade()` before
+applying and committing the revision. Autogeneration creates candidate revisions;
+it does not regenerate `env.py`.
 
 ## Checks
 
@@ -44,13 +99,30 @@ uv run --locked mypy app tests
 uv run --locked pytest
 ```
 
-The CI workflow runs these checks and starts the Compose stack to check `/health`
-and entries parameter validation without contacting Hacker News.
+The CI workflow runs these checks with a PostgreSQL service and starts the Compose
+stack to check `/health` and entries parameter validation without contacting
+Hacker News.
 
 Scraper and application assembly tests use saved synthetic HTML fixtures and
 HTTPX mock transports. Service and API tests use fake source/usage adapters to
 check response schemas, filtering, request IDs, concurrent requests, one event per
 valid request, and error mapping. Ordinary checks do not contact Hacker News.
+
+PostgreSQL integration tests skip unless `TEST_DATABASE_URL` is set. To run them
+against the existing Docker database from `backend` (POSIX shell):
+
+```sh
+TEST_DATABASE_URL='postgresql+asyncpg://YOUR_USER:URL_ENCODED_PASSWORD@localhost:5433/YOUR_DATABASE' uv run --locked pytest tests/integration
+```
+
+Substitute your configured database, user, and URL-encoded password. In PowerShell, set
+`$env:TEST_DATABASE_URL` to that URL, run
+`uv run --locked pytest tests/integration`, then
+`Remove-Item Env:TEST_DATABASE_URL`. The test user must have `CREATEDB` permission
+(the Compose development user does). Each test creates a uniquely named database,
+applies real migrations, and drops only that database afterward. Tests verify
+committed values, concurrent writes, transaction rollback, API persistence/error
+handling, schema drift, and migration downgrade/upgrade. CI enables these tests.
 
 To opt into a single live fetch from `backend`:
 
@@ -97,14 +169,18 @@ header matches the body ID. Invalid filters return 422, upstream timeouts 504,
 upstream HTTP/parsing failures 502, usage-recording failures 503, and unexpected
 internal errors 500. Exception details stay in application logs.
 
-### Stage 4 usage recording
+### Usage recording
 
 The service awaits exactly one recording attempt for each valid filter request,
 including failed upstream attempts. Invalid filters create no usage event.
-The temporary `LoggingUsageRecorder` emits a JSON warning with
-`event: "usage_not_persisted"`; it does **not** store events in PostgreSQL.
-Inspect these events with `docker compose logs api` or the local API console.
-Successful responses at this stage confirm logging only, not durable storage.
+`PostgresUsageRepository` commits each event to `usage_events` before the response.
+The request UUID is the primary key, timestamps use PostgreSQL `timestamptz`, and
+database constraints enforce valid filters, outcomes, counts, and durations.
+Inspect stored events from the repository root:
+
+```sh
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT * FROM usage_events ORDER BY requested_at DESC LIMIT 20;"'
+```
 
 Events include the request UUID, UTC request-start timestamp (`requested_at`),
 filter, outcome (`success`, `upstream_timeout`, `upstream_error`, or
@@ -115,8 +191,8 @@ Each request gets its own event, even when a source reports a cache hit. If
 recording raises an error, 503 takes precedence over the original result/error,
 with a structured diagnostic log and no retry.
 
-Stage 5 replaces the temporary recorder with PostgreSQL persistence and schema
-migrations. The web interface is planned for Stage 7.
+Persistence failures appear in `docker compose logs api` or the native API console.
+The web interface is planned for Stage 7.
 
 ## Entry rules
 
