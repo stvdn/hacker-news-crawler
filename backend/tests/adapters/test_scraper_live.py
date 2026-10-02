@@ -6,7 +6,7 @@ import os
 import httpx
 import pytest
 
-from app.scraper import HackerNewsScraper
+from app.adapters.scraper import HackerNewsScraper
 
 
 @pytest.mark.skipif(

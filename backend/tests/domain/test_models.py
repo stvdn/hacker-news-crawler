@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
-from app.models import Entry, EntrySnapshot
+from app.domain.models import Entry, EntrySnapshot
 
 
 @pytest.mark.parametrize("number", [0, -1, True, 1.5])

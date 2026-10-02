@@ -47,16 +47,18 @@ uv run --locked pytest
 The CI workflow runs these checks and starts the Compose stack to check `/health`.
 
 Scraper tests use saved synthetic HTML fixtures and HTTPX mock transports;
-ordinary checks do not contact Hacker News.
+ordinary checks do not contact Hacker News. Tests are grouped under
+`backend/tests/api/`, `domain/`, and `adapters/`; saved HTML stays in
+`backend/tests/fixtures/`. These groups mirror the planned application packages.
 
 To opt into a single live fetch from `backend`:
 
 ```sh
-HN_LIVE_SMOKE=1 uv run --locked pytest tests/test_scraper_live.py
+HN_LIVE_SMOKE=1 uv run --locked pytest tests/adapters/test_scraper_live.py
 ```
 
 In PowerShell, set `$env:HN_LIVE_SMOKE = "1"`, run
-`uv run --locked pytest tests/test_scraper_live.py`, then remove the opt-in with
+`uv run --locked pytest tests/adapters/test_scraper_live.py`, then remove the opt-in with
 `Remove-Item Env:HN_LIVE_SMOKE`. The live check depends on upstream availability.
 
 ## Scraper

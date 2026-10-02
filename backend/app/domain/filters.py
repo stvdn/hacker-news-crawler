@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from app.models import Entry, EntryFilter
+from app.domain.models import Entry, EntryFilter
 
 
 def count_title_words(title: str) -> int:
