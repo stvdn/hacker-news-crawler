@@ -1,6 +1,6 @@
 # Hacker News Crawler
 
-An interview project for scraping and filtering the first 30 Hacker News front-page entries and recording API usage. This repository currently contains the FastAPI health endpoint and development PostgreSQL service. Planned functionality is tracked in [the implementation plan](docs/implementation-plan.md).
+An interview project for scraping and filtering the first 30 Hacker News front-page entries and recording API usage. This repository currently contains the FastAPI health endpoint, entry models and filtering rules, HTML scraper, and development PostgreSQL service. Planned functionality is tracked in [the implementation plan](docs/implementation-plan.md).
 
 ## Requirements
 
@@ -45,6 +45,35 @@ uv run --locked pytest
 ```
 
 The CI workflow runs these checks and starts the Compose stack to check `/health`.
+
+Scraper tests use saved synthetic HTML fixtures and HTTPX mock transports;
+ordinary checks do not contact Hacker News.
+
+To opt into a single live fetch from `backend`:
+
+```sh
+HN_LIVE_SMOKE=1 uv run --locked pytest tests/test_scraper_live.py
+```
+
+In PowerShell, set `$env:HN_LIVE_SMOKE = "1"`, run
+`uv run --locked pytest tests/test_scraper_live.py`, then remove the opt-in with
+`Remove-Item Env:HN_LIVE_SMOKE`. The live check depends on upstream availability.
+
+## Scraper
+
+`HackerNewsScraper` accepts a caller-owned `httpx.AsyncClient` and asynchronously
+returns an immutable snapshot from `fetch_first_30()`. It fetches the fixed Hacker
+News front-page URL once, sends a descriptive User-Agent, and uses explicit
+connect/read/write/pool timeouts of 5/10/5/5 seconds. It does not retry or follow
+redirects. Snapshots have a UTC extraction-completion time and `cache_hit=false`.
+
+The Beautiful Soup parser uses Python's built-in HTML parser and takes the first
+30 story rows, including hiring entries. Each story uses only its adjacent
+metadata row. `discuss` means zero comments; unavailable or unreadable metrics
+are null. Missing/invalid ranks or titles, duplicate ranks, or fewer than 30
+entries raise a parsing error without substituting later stories. Timeout,
+HTTP/transport, and parsing errors have separate exception types for the future
+API layer. The scraper is not yet wired to an HTTP endpoint.
 
 ## Available API
 
