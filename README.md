@@ -61,19 +61,14 @@ In PowerShell, set `$env:HN_LIVE_SMOKE = "1"`, run
 
 ## Scraper
 
-`HackerNewsScraper` accepts a caller-owned `httpx.AsyncClient` and asynchronously
-returns an immutable snapshot from `fetch_first_30()`. It fetches the fixed Hacker
-News front-page URL once, sends a descriptive User-Agent, and uses explicit
-connect/read/write/pool timeouts of 5/10/5/5 seconds. It does not retry or follow
-redirects. Snapshots have a UTC extraction-completion time and `cache_hit=false`.
+The scraper reads the first 30 Hacker News front-page entries, including hiring
+posts, and preserves their original ranks. `discuss` means zero comments;
+unavailable metrics become `null`. Invalid or incomplete pages fail instead of
+returning partial results. The entries endpoint is not implemented yet.
 
-The Beautiful Soup parser uses Python's built-in HTML parser and takes the first
-30 story rows, including hiring entries. Each story uses only its adjacent
-metadata row. `discuss` means zero comments; unavailable or unreadable metrics
-are null. Missing/invalid ranks or titles, duplicate ranks, or fewer than 30
-entries raise a parsing error without substituting later stories. Timeout,
-HTTP/transport, and parsing errors have separate exception types for the future
-API layer. The scraper is not yet wired to an HTTP endpoint.
+See [Checks](#checks) for fixture tests and the optional live smoke check, and the
+[implementation plan](docs/implementation-plan.md#api-and-business-rules) for
+detailed scraping requirements.
 
 ## Available API
 

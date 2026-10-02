@@ -6,6 +6,12 @@ Use the repository's code, configuration, README, and implementation plan for pr
 
 - Keep changes focused on the user's request. Avoid unrelated refactors, new dependencies, or architectural changes unless they are necessary to complete the work; explain the reason when they are.
 
+## Branches
+
+- Use short-lived branches named `<type>/<short-description>`, such as `feat/stage-3-scraper`, `fix/missing-comment-count`, or `docs/setup-guide`. Choose a type that describes the work: `feat`, `fix`, `docs`, `test`, `refactor`, `ci`, or `chore`.
+- Use lowercase words separated by hyphens. Keep names concise and specific; avoid spaces, vague names such as `changes` or `updates`, and personal or tool names as prefixes.
+- Follow an explicitly requested branch name. Do not rename an existing published branch without the user's instruction.
+
 ## Commits
 
 - Create commits only when the user explicitly requests them. A request to implement or edit something does not authorize a commit. Otherwise, leave the changes uncommitted for review.
