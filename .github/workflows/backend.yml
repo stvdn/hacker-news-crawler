@@ -7,6 +7,20 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: hacker_news
+          POSTGRES_USER: hacker_news
+          POSTGRES_PASSWORD: local_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hacker_news -d hacker_news"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://hacker_news:local_test_password@localhost:5432/hacker_news
     defaults:
       run:
         working-directory: backend
@@ -23,6 +37,11 @@ jobs:
 
   compose-smoke:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_DB: compose_test_database
+      POSTGRES_USER: compose_test_user
+      # Disposable credentials also exercise reserved characters in the password.
+      POSTGRES_PASSWORD: 'compose@test/password:%?#$'
     steps:
       - uses: actions/checkout@v4
       - run: docker compose config --quiet

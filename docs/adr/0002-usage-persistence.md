@@ -1,6 +1,6 @@
 # ADR-002: Confirm usage persistence before returning a successful response
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-01
 
 ## Context
@@ -17,7 +17,10 @@ If persistence fails, return HTTP 503 and emit a diagnostic log. Do not claim th
 
 Events represent API requests, not unique users or necessarily unique human actions.
 
-PostgreSQL is the planned implementation. This record addresses the persistence guarantee and its failure implications; product selection is an implementation detail.
+PostgreSQL stores usage events through an async SQLAlchemy repository, with a
+separate session and committed transaction per write. Alembic owns schema changes;
+Compose gates API startup on a successful migration. Integration tests apply the
+real migrations to isolated PostgreSQL databases rather than substituting SQLite.
 
 ## Alternatives considered
 
