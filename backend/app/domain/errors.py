@@ -15,3 +15,7 @@ class UpstreamHTTPError(UpstreamError):
 
 class UpstreamParsingError(UpstreamError):
     """The source HTML did not contain 30 valid entries."""
+
+
+class PersistenceError(Exception):
+    """The usage recorder could not complete a write."""
