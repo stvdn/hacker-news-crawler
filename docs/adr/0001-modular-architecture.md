@@ -1,6 +1,6 @@
 # ADR-001: Isolate business rules and infrastructure through a modular structure
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-01
 
 ## Context
@@ -10,6 +10,22 @@ The application combines deterministic rules—word counting, filtering, and sor
 ## Decision
 
 Implement the rules as pure functions and coordinate operations through `EntryService`. Establish boundaries between rules and infrastructure using a small modular structure.
+
+Use a lightweight ports-and-adapters package structure:
+
+- `app/api/`: endpoints in `routes.py`, Pydantic schemas in `schemas.py`, and request context middleware/error responses in `errors.py`.
+- `app/domain/`: immutable models, pure filters, port contracts, and shared exceptions.
+- `app/adapters/`: HTML scraping and usage recording; the cache wrapper joins in Stage 6.
+- `app/service.py`: orchestration through the domain contracts.
+- `app/main.py`: application lifespan and dependency assembly.
+
+The domain has no dependency on the API or adapters. The service imports only the
+domain and standard library; API routes invoke the service, adapters implement
+domain ports, and startup connects them. Group tests under `tests/api/`,
+`tests/domain/`, and `tests/adapters/`, with `test_service.py`, shared `conftest.py`,
+and saved HTML `fixtures/` at the test root. Package names communicate technical
+responsibilities rather than business features, so this is not a
+screaming-architecture layout.
 
 Use classes for components with state, resources, or dependencies: the scraper, cache, service, and usage repository. Define two contracts using `Protocol`: `EntrySource` and `UsageRecorder`. Inject their implementations when constructing the service.
 
@@ -22,7 +38,8 @@ Use OOP where it supports encapsulation and dependency management. Stateless fun
 ## Alternatives considered
 
 - Implement everything inside routes: less initial structure, but mixed responsibilities and harder isolated testing.
-- Organize the entire application explicitly into ports and adapters: makes boundaries visible. For the current scope, retain those principles with fewer subdivisions and without duplicating models per layer; hexagonal architecture does not require an interface for every class either.
+- Keep every module directly under `app/`: sufficient initially, but as the backend grows, grouping HTTP, domain, and adapter responsibilities improves navigation.
+- Organize by business feature (screaming architecture): useful when distinct capabilities grow, but the current application centers on one entries flow. Revisit if independent features emerge.
 - Create classes and interfaces for every operation: provides uniformity but introduces abstractions without state or meaningful alternative implementations.
 
 ## Consequences

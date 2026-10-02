@@ -28,5 +28,18 @@ jobs:
       - run: docker compose config --quiet
       - run: docker compose up --build --detach --wait
       - run: curl --fail --silent http://127.0.0.1:8000/health | grep -Fx '{"status":"ok"}'
+      - name: Check entries validation without upstream access
+        run: |
+          curl --silent --show-error --output /tmp/entries-error.json --write-out '%{http_code}' \
+            'http://127.0.0.1:8000/api/v1/entries?filter=invalid' | grep -Fx '422'
+          python - <<'PY'
+          import json
+          from uuid import UUID
+
+          with open('/tmp/entries-error.json') as response:
+              body = json.load(response)
+          UUID(body['request_id'])
+          assert body['detail'] == 'Invalid request parameters'
+          PY
       - if: always()
         run: docker compose down --volumes

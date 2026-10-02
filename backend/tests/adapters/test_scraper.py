@@ -5,17 +5,19 @@ from pathlib import Path
 import httpx
 import pytest
 
-from app.scraper import (
+from app.adapters.scraper import (
     SOURCE_URL,
     USER_AGENT,
     HackerNewsScraper,
+    parse_entries,
+)
+from app.domain.errors import (
     UpstreamHTTPError,
     UpstreamParsingError,
     UpstreamTimeoutError,
-    parse_entries,
 )
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parents[1] / "fixtures"
 
 
 @pytest.fixture

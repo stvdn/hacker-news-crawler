@@ -17,7 +17,9 @@ Repository name: `hacker-news-crawler`. A Python import package, if needed, uses
 - Verification: pytest, Ruff, mypy, frontend lint/type checks, and Playwright.
 - Delivery: Docker Compose and GitHub Actions. Select supported runtime versions at scaffolding, record them, and commit dependency lockfiles.
 
-Use a small modular application, with inward dependency boundaries rather than a complete hexagonal framework:
+Use a small modular application with ports-and-adapters boundaries. Organize
+HTTP handling, domain contracts/rules, and external adapters into packages;
+keep orchestration and dependency assembly at the application root:
 
 ```text
 Next.js -> FastAPI routes -> EntryService
@@ -26,22 +28,39 @@ Next.js -> FastAPI routes -> EntryService
                               `-- PostgresUsageRepository -> PostgreSQL
 ```
 
-Suggested repository structure:
+Repository structure (cache, migrations, and frontend are added in later stages):
 
 ```text
 backend/
   app/
     main.py
-    routes.py
-    models.py
     service.py
-    scraper.py
-    cache.py
-    filters.py
-    ports.py
-    usage.py
+    api/
+      routes.py
+      schemas.py
+      errors.py
+    domain/
+      models.py
+      filters.py
+      ports.py
+      errors.py
+    adapters/
+      scraper.py
+      usage.py
+      cache.py
   tests/
+    conftest.py
     fixtures/
+    api/
+      test_entries.py
+      test_health.py
+    domain/
+      test_filters.py
+      test_models.py
+    adapters/
+      test_scraper.py
+      test_scraper_live.py
+    test_service.py
   migrations/
 frontend/
   src/app/
@@ -54,6 +73,20 @@ README.md
 .env.example
 .github/workflows/
 ```
+
+`api/` owns HTTP schemas, routes, request context middleware, and error mapping.
+Keep Pydantic request/response schemas in `api/schemas.py` and endpoints in
+`api/routes.py`; domain dataclasses remain in `domain/models.py`.
+`domain/` owns immutable data, pure filtering, the two port contracts, and shared
+application exceptions; it must not import the API, adapters, or their libraries.
+`service.py` coordinates the domain and ports without importing concrete adapters.
+`adapters/` implements the ports for external access and caching. `main.py` owns
+lifespan resources and assembles the service, adapters, routes, and error handling.
+Tests mirror these responsibilities under `backend/tests/api/`, `domain/`, and
+`adapters/`; service tests stay at the test root. Shared pytest fixtures belong in
+the root `conftest.py`, and saved HTML stays in `tests/fixtures/`. Fixtures used
+only by one group can live in that group's `conftest.py`.
+This is a technical responsibility layout using ports and adapters.
 
 ### OOP, interfaces, and patterns
 
@@ -147,7 +180,7 @@ Keep one repository and an executable `main`. Use short feature branches, cohere
 - [x] Stage 1 — Scaffold backend and health endpoint; add the API Dockerfile, Compose API/PostgreSQL services, `.dockerignore`, `.env.example`, initial README, dependency management, lint/type checks, and initial CI. Verify container startup and the health endpoint.
 - [x] Stage 2 — Entry models and pure rules, with complete unit tests.
 - [x] Stage 3 — Scraper and saved HTML fixtures, including failure cases.
-- [ ] Stage 4 — Service, entries HTTP endpoint, dependency assembly, and tests; verify the existing API container with the new dependencies.
+- [x] Stage 4 — Service, entries HTTP endpoint, dependency assembly, and tests; verify the existing API container with the new dependencies. Uses an explicit logging-only usage recorder until Stage 5; successful responses do not yet imply durable persistence.
 - [ ] Stage 5 — PostgreSQL migration, repository, migration service, startup readiness gates, and integration tests using the existing database service.
 - [ ] Stage 6 — Cache wrapper and deterministic expiration/concurrency tests.
 - [ ] Stage 7 — Next.js interface, frontend container, integrated Compose startup, and browser tests.

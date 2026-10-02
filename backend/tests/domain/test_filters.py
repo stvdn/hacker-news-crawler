@@ -1,7 +1,7 @@
 import pytest
 
-from app.filters import count_title_words, filter_entries
-from app.models import Entry, EntryFilter
+from app.domain.filters import count_title_words, filter_entries
+from app.domain.models import Entry, EntryFilter
 
 
 def entry(

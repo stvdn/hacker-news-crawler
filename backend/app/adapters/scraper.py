@@ -6,28 +6,17 @@ from datetime import UTC, datetime
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from app.models import Entry, EntrySnapshot
+from app.domain.errors import (
+    UpstreamHTTPError,
+    UpstreamParsingError,
+    UpstreamTimeoutError,
+)
+from app.domain.models import Entry, EntrySnapshot
 
 # Fixed by the project requirements; this parser supports Hacker News HTML only.
 SOURCE_URL = "https://news.ycombinator.com/"
 USER_AGENT = "hacker-news-crawler/0.1 (HTML front-page reader)"
 TIMEOUT = httpx.Timeout(connect=5, read=10, write=5, pool=5)
-
-
-class UpstreamError(Exception):
-    """The source could not supply a complete snapshot."""
-
-
-class UpstreamTimeoutError(UpstreamError):
-    """The upstream request exceeded its timeout."""
-
-
-class UpstreamHTTPError(UpstreamError):
-    """An upstream transport or HTTP status failure."""
-
-
-class UpstreamParsingError(UpstreamError):
-    """The source HTML did not contain 30 valid entries."""
 
 
 def _metric(text: str, label: str) -> int | None:
