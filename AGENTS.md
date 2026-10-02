@@ -17,6 +17,7 @@ Use the repository's code, configuration, README, and implementation plan for pr
 
 - Create a PR only when the user explicitly requests one. Permission to commit or push does not by itself authorize a PR. Push changes only when requested or necessary for an explicitly requested PR.
 - When a PR is requested, use a short-lived branch and keep the PR focused. Explain why the change is needed, what changed, how it was verified, and any material limitation. Link an existing issue when there is one.
+- Structure PR descriptions with `## Summary`, `## Changes`, and `## Verification`. State the outcome in the summary, list the substantive changes, and report the checks and their results. Keep each section proportional to the size of the change.
 - Check CI and address failures caused by the change. Merge only when the user explicitly requests it.
 
 ## Before handing off
