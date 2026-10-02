@@ -145,7 +145,7 @@ Measure fixture parsing/filtering separately from full API latency. Compare a sm
 Keep one repository and an executable `main`. Use short feature branches, coherent commits, and small pull requests with purpose and verification notes. Tests and documentation accompany each feature. Preserve useful commits; do not fabricate historical progress or leave all tests until the end.
 
 - [x] Stage 1 — Scaffold backend and health endpoint; add the API Dockerfile, Compose API/PostgreSQL services, `.dockerignore`, `.env.example`, initial README, dependency management, lint/type checks, and initial CI. Verify container startup and the health endpoint.
-- [ ] Stage 2 — Entry models and pure rules, with complete unit tests.
+- [x] Stage 2 — Entry models and pure rules, with complete unit tests.
 - [ ] Stage 3 — Scraper and saved HTML fixtures, including failure cases.
 - [ ] Stage 4 — Service, entries HTTP endpoint, dependency assembly, and tests; verify the existing API container with the new dependencies.
 - [ ] Stage 5 — PostgreSQL migration, repository, migration service, startup readiness gates, and integration tests using the existing database service.

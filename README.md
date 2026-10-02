@@ -49,3 +49,18 @@ The CI workflow runs these checks and starts the Compose stack to check `/health
 ## Available API
 
 `GET /health` returns `{"status":"ok"}`. The entries endpoint and web interface are not implemented yet.
+
+## Entry rules
+
+| Filter | Selection | Order |
+|---|---|---|
+| `all` | All fetched entries | Original rank ascending |
+| `long` | Titles with more than five words | Comments descending |
+| `short` | Titles with five or fewer words | Points descending |
+
+Ties use original rank; unavailable metrics sort last. A word is a
+whitespace-separated token containing a Unicode letter or digit.
+See the [full rules and examples](docs/implementation-plan.md#api-and-business-rules).
+
+The [architecture decision](docs/adr/0001-modular-architecture.md) explains the
+module boundaries.
