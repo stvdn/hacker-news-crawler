@@ -73,7 +73,8 @@ fields, error codes, and usage semantics.
   usage event. This makes database availability and write latency part of serving
   stories. [Persistence decision](docs/adr/0002-usage-persistence.md).
 - **Bounded snapshot reuse.** A process-local cache reuses the complete extraction
-  for 60 seconds by default, while every request still filters and records usage.
+  for 60 seconds by default. Concurrent requests share one refresh, including
+  its failure; a later request can retry. Every request still filters and records usage.
   [Cache decision](docs/adr/0003-snapshot-cache.md).
 
 The stack is Next.js 16, React 19, TypeScript, Tailwind CSS v4 and shadcn/ui on
@@ -85,7 +86,7 @@ and dependency boundaries.
 ## Verification
 
 GitHub Actions runs backend lint, types and tests with PostgreSQL; frontend lint,
-types, build and Playwright; and a Compose startup smoke check. Ordinary checks
+types, unit tests, build and Playwright; and a Compose startup smoke check. Ordinary checks
 use controlled data and do not contact Hacker News.
 
 After the [native setup](docs/development.md#run-the-api-locally), run from `backend`:
@@ -101,6 +102,7 @@ After the [frontend setup](docs/development.md#run-the-frontend-locally), run fr
 ```sh
 pnpm lint
 pnpm typecheck
+pnpm test:unit
 pnpm build
 pnpm exec playwright install chromium
 pnpm test:e2e

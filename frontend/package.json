@@ -12,6 +12,7 @@
     "start": "next start --hostname 127.0.0.1",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
+    "test:unit": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test unit-tests/*.test.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

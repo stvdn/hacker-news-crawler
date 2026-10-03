@@ -25,12 +25,16 @@ ENTRIES = (
     Entry(6, "Example company is hiring", None, None),
     *(Entry(rank, f"Example story {rank}", rank, rank) for rank in range(7, 31)),
 )
+LONG_ONLY_ENTRIES = tuple(
+    Entry(rank, f"Example long story number {rank} today", rank, rank)
+    for rank in range(1, 31)
+)
 
 
 class Scenario(BaseModel):
     status: int = 200
     delay: float = Field(default=0, ge=0, le=5)
-    empty: bool = False
+    all_long_titles: bool = False
 
 
 scenario = Scenario()
@@ -45,7 +49,7 @@ class BrowserSource:
         if scenario.status == 502:
             raise UpstreamHTTPError("Synthetic upstream failure")
         return EntrySnapshot(
-            () if scenario.empty else ENTRIES,
+            LONG_ONLY_ENTRIES if scenario.all_long_titles else ENTRIES,
             datetime(2026, 10, 2, 12, 0, tzinfo=UTC),
             cache_hit=False,
         )

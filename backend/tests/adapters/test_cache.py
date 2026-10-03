@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
+from time import monotonic
 from uuid import uuid4
 
 import pytest
@@ -13,7 +14,13 @@ from app.domain.errors import (
     UpstreamParsingError,
     UpstreamTimeoutError,
 )
-from app.domain.models import Entry, EntryFilter, EntrySnapshot, RequestContext
+from app.domain.models import (
+    Entry,
+    EntryFilter,
+    EntrySnapshot,
+    RequestContext,
+    UsageOutcome,
+)
 from app.service import EntryService
 
 
@@ -214,53 +221,64 @@ def test_concurrent_misses_share_one_successful_refresh(
     asyncio.run(run())
 
 
-def test_concurrent_failed_refreshes_remain_serialized(source: FakeSource) -> None:
+def test_concurrent_failed_refresh_is_shared_and_each_request_is_recorded(
+    source: FakeSource, recorder: FakeRecorder
+) -> None:
     async def run() -> None:
-        active = maximum = 0
+        entered, release = asyncio.Event(), asyncio.Event()
 
         class FailingSource(FakeSource):
             async def fetch_first_30(self) -> EntrySnapshot:
-                nonlocal active, maximum
-                active += 1
-                maximum = max(maximum, active)
-                try:
-                    await asyncio.sleep(0)
-                    return await super().fetch_first_30()
-                finally:
-                    active -= 1
+                entered.set()
+                await release.wait()
+                return await super().fetch_first_30()
 
         upstream = FailingSource(source.snapshot)
         upstream.failure = UpstreamTimeoutError("unavailable")
         cache = CachedEntrySource(upstream)
+        service = EntryService(cache, recorder)
+
+        async def request() -> None:
+            await service.get_entries(
+                EntryFilter.ALL,
+                RequestContext(uuid4(), datetime.now(UTC), monotonic()),
+            )
+
+        requests = [asyncio.create_task(request()) for _ in range(6)]
+        await asyncio.wait_for(entered.wait(), timeout=5)
+        await asyncio.sleep(0)  # Let all requests join the in-flight refresh.
+        release.set()
         results = await asyncio.wait_for(
-            asyncio.gather(
-                *(cache.fetch_first_30() for _ in range(6)), return_exceptions=True
-            ),
-            timeout=5,
+            asyncio.gather(*requests, return_exceptions=True), timeout=5
         )
         assert all(isinstance(result, UpstreamTimeoutError) for result in results)
-        assert upstream.calls == 6
-        assert maximum == 1
+        assert upstream.calls == 1
+        assert len(recorder.events) == 6
+        assert all(
+            event.outcome == UsageOutcome.UPSTREAM_TIMEOUT
+            for event in recorder.events
+        )
+        assert len({event.request_id for event in recorder.events}) == 6
         upstream.failure = None
         assert not (await cache.fetch_first_30()).cache_hit
         assert (await cache.fetch_first_30()).cache_hit
+        assert upstream.calls == 2
 
     asyncio.run(run())
 
 
-def test_cancelled_refresh_releases_lock_for_waiter(source: FakeSource) -> None:
+def test_cancelled_request_preserves_refresh_for_waiter(source: FakeSource) -> None:
     async def run() -> None:
-        entered = asyncio.Event()
+        entered, release = asyncio.Event(), asyncio.Event()
 
-        class CancelledSource(FakeSource):
+        class GatedSource(FakeSource):
             async def fetch_first_30(self) -> EntrySnapshot:
                 self.calls += 1
-                if self.calls == 1:
-                    entered.set()
-                    await asyncio.Event().wait()
+                entered.set()
+                await release.wait()
                 return self.snapshot
 
-        upstream = CancelledSource(source.snapshot)
+        upstream = GatedSource(source.snapshot)
         cache = CachedEntrySource(upstream)
         first = asyncio.create_task(cache.fetch_first_30())
         await asyncio.wait_for(entered.wait(), timeout=5)
@@ -269,9 +287,11 @@ def test_cancelled_refresh_releases_lock_for_waiter(source: FakeSource) -> None:
         first.cancel()
         with pytest.raises(asyncio.CancelledError):
             await first
-        assert not (await asyncio.wait_for(second, timeout=5)).cache_hit
+        assert upstream.calls == 1
+        release.set()
+        assert (await asyncio.wait_for(second, timeout=5)).cache_hit
         assert (await cache.fetch_first_30()).cache_hit
-        assert upstream.calls == 2
+        assert upstream.calls == 1
 
     asyncio.run(run())
 

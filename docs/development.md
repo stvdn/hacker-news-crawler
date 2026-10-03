@@ -147,6 +147,7 @@ From `frontend`, run:
 ```sh
 pnpm lint
 pnpm typecheck
+pnpm test:unit
 pnpm build
 pnpm exec playwright install chromium
 pnpm test:e2e
