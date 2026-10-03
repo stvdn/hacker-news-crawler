@@ -48,6 +48,9 @@ jobs:
       - run: docker compose config --quiet
       - run: docker compose up --build --detach --wait
       - run: curl --fail --silent http://127.0.0.1:8000/health | grep -Fx '{"status":"ok"}'
+      - run: curl --fail --silent http://127.0.0.1:3000/health | grep -Fx '{"status":"ok"}'
+      - name: Check the web page without upstream access
+        run: curl --fail --silent 'http://127.0.0.1:3000/?filter=invalid' | grep -F 'Unknown filter'
       - name: Check entries validation without upstream access
         run: |
           curl --silent --show-error --output /tmp/entries-error.json --write-out '%{http_code}' \
