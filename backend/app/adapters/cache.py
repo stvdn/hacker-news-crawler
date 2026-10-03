@@ -1,4 +1,4 @@
-"""Process-local snapshot cache with one refresh at a time."""
+"""Process-local snapshot cache with one shared refresh at a time."""
 
 import asyncio
 import math
@@ -39,7 +39,7 @@ class CachedEntrySource:
         self._source = source
         self._ttl_seconds = _validate_ttl(ttl_seconds)
         self._clock = clock
-        self._lock = asyncio.Lock()
+        self._refresh_task: asyncio.Task[EntrySnapshot] | None = None
         self._snapshot: EntrySnapshot | None = None
         self._expires_at = 0.0
 
@@ -55,6 +55,20 @@ class CachedEntrySource:
         # The wrapper owns per-request hit metadata; it never mutates the source.
         return replace(snapshot, cache_hit=False)
 
+    async def _refresh(self) -> EntrySnapshot:
+        snapshot = await self._fetch_snapshot()
+        self._snapshot = snapshot
+        self._expires_at = self._clock() + self._ttl_seconds
+        return snapshot
+
+    def _refresh_done(self, task: asyncio.Task[EntrySnapshot]) -> None:
+        if self._refresh_task is task:
+            self._refresh_task = None
+        # A refresh can finish after all its callers have been cancelled.
+        # Retrieve its exception so asyncio does not report it as unhandled.
+        if not task.cancelled():
+            task.exception()
+
     async def fetch_first_30(self) -> EntrySnapshot:
         if self._ttl_seconds == 0:
             return await self._fetch_snapshot()
@@ -63,14 +77,15 @@ class CachedEntrySource:
         if snapshot is not None:
             return snapshot
 
-        async with self._lock:
-            # Another request may have completed a refresh while we waited.
-            snapshot = self._cached_snapshot()
-            if snapshot is not None:
-                return snapshot
+        # No await occurs between checking and setting the task, so callers on
+        # this event loop join the same refresh, including its failure.
+        task = self._refresh_task
+        started_refresh = task is None
+        if task is None:
+            task = asyncio.create_task(self._refresh())
+            self._refresh_task = task
+            task.add_done_callback(self._refresh_done)
 
-            snapshot = await self._fetch_snapshot()
-            expires_at = self._clock() + self._ttl_seconds
-            self._snapshot = snapshot
-            self._expires_at = expires_at
-            return snapshot
+        # Cancelling one request must not cancel the refresh for other waiters.
+        snapshot = await asyncio.shield(task)
+        return replace(snapshot, cache_hit=not started_refresh)

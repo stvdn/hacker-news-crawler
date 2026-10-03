@@ -18,16 +18,16 @@ The 60-second default balances reuse and freshness; it is not a measured optimum
 Compare with caching disabled and use latency, upstream request volume, and
 freshness needs to decide whether to retain or tune it.
 
-Use a monotonic clock for expiration, measured from the completion of a successful extraction, and an asynchronous lock to coordinate refreshes. Recheck freshness after acquiring the lock to reuse a refresh another request has completed.
+Use a monotonic clock for expiration, measured from the completion of a successful extraction. Concurrent requests await the same refresh task, so they share its result or failure. Cancelling one request does not cancel the refresh for other waiters.
 
-Do not cache errors or partial results. If the snapshot has expired and refresh fails, return the error rather than silently serving expired data. Subsequent requests may retry refresh under the same lock; sharing a failed result among them is not guaranteed.
+Do not cache errors or partial results. If the snapshot has expired and refresh fails, return the error rather than silently serving expired data. Requests already waiting on that refresh receive the same failure; a later request can start a new refresh.
 
 Expose `fetched_at` in UTC. Record each request even when it does not cause a download. The initial deployment uses one API process.
 
 `CachedEntrySource` wraps the scraper at application startup. It checks for a
 complete 30-entry snapshot, returns a separate immutable snapshot with per-request
 hit metadata, and starts expiry after a successful fetch. Zero TTL bypasses cache
-reuse and the refresh lock. Invalid, negative, or non-finite TTL values stop startup.
+reuse and refresh coordination. Invalid, negative, or non-finite TTL values stop startup.
 
 ## Alternatives considered
 
@@ -43,7 +43,7 @@ reuse and the refresh lock. Invalid, negative, or non-finite TTL values stop sta
 - Multiple processes would maintain independent caches.
 - Two selections separated by an expiration can use different snapshots.
 - Expiration, concurrency, failures, and immutability require tests.
-- The lock prevents simultaneous refreshes within the process, but an upstream outage can still cause consecutive failed attempts. It does not provide rate limiting or complete protection against sustained failures.
+- A shared task prevents simultaneous refreshes within the process. An upstream outage can still cause consecutive failed attempts from later requests; this does not provide rate limiting or complete protection against sustained failures.
 - Usage persistence remains necessary for every request; caching does not remove that dependency.
 
 ## Revisit when
