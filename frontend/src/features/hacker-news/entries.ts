@@ -1,5 +1,13 @@
 import "server-only";
 
+import {
+  categorizeFailure,
+  failureMessage,
+  logEntriesFailure,
+  requestIdFrom,
+  type FailurePhase,
+} from "./entry-errors";
+
 export const filters = {
   all: { label: "All stories", hint: "First 30 entries", description: "Original front-page order", order: "rank" },
   long: { label: "Long titles", hint: "More than 5 words", description: "Most comments first", order: "comments" },
@@ -59,22 +67,27 @@ const messages: Record<number, string> = {
 };
 
 export async function fetchEntries(filter: EntryFilter): Promise<EntriesResult> {
+  let phase: FailurePhase = "configuration";
+  let requestId: string | undefined;
   try {
     const base = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
     const url = new URL("/api/v1/entries", base);
     url.searchParams.set("filter", filter);
+    phase = "request";
     const response = await fetch(url, {
       cache: "no-store",
       // Longer than the scraper's timeouts, allowing time for usage persistence.
       signal: AbortSignal.timeout(30_000),
     });
+    requestId = requestIdFrom(response);
     if (!response.ok) {
-      const requestId = response.headers.get("x-request-id");
+      logEntriesFailure(filter, "api_error", requestId, response.status);
       return { error: {
         message: messages[response.status] ?? "The stories could not be loaded. Please try again.",
-        requestId: requestId && /^[\da-f-]{36}$/i.test(requestId) ? requestId : undefined,
+        requestId,
       } };
     }
+    phase = "response";
     const data: EntriesPayload = await response.json();
     // Fail safely if a proxy or incompatible API returns a different payload.
     if (!Array.isArray(data.entries) || data.filter !== filter ||
@@ -89,7 +102,9 @@ export async function fetchEntries(filter: EntryFilter): Promise<EntriesResult> 
         comments: optionalMetric(entry.comments),
       })),
     } };
-  } catch {
-    return { error: { message: "The stories service could not be reached. Please try again shortly." } };
+  } catch (error) {
+    const category = categorizeFailure(phase, error);
+    logEntriesFailure(filter, category, requestId);
+    return { error: { message: failureMessage(category), requestId } };
   }
 }

@@ -86,7 +86,7 @@ and dependency boundaries.
 ## Verification
 
 GitHub Actions runs backend lint, types and tests with PostgreSQL; frontend lint,
-types, build and Playwright; and a Compose startup smoke check. Ordinary checks
+types, unit tests, build and Playwright; and a Compose startup smoke check. Ordinary checks
 use controlled data and do not contact Hacker News.
 
 After the [native setup](docs/development.md#run-the-api-locally), run from `backend`:
@@ -102,6 +102,7 @@ After the [frontend setup](docs/development.md#run-the-frontend-locally), run fr
 ```sh
 pnpm lint
 pnpm typecheck
+pnpm test:unit
 pnpm build
 pnpm exec playwright install chromium
 pnpm test:e2e

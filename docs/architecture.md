@@ -76,7 +76,9 @@ request counts are not a count of distinct human actions.
 
 `Suspense` presents a loading state while stories are requested. The results
 component handles empty results and safe API errors with a retry link and, when
-available, a request ID. Invalid URL filters are rejected before fetching.
+available, a request ID. The Next.js server logs failure categories and the API
+request ID when available, without storing frontend diagnostics in PostgreSQL.
+Invalid URL filters are rejected before fetching.
 The displayed UTC fetch time and result count describe the returned snapshot.
 
 The UI uses a semantic table with row and column headers, `aria-sort` on the
