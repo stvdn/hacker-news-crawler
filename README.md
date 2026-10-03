@@ -314,6 +314,8 @@ shows the complete directory layout.
 
 ## Release verification
 
+The [Stage 8 verification record](docs/release-verification.md) reports the clean
+clone, Compose, migration, automated check, and timing results for `v1.0.0`.
 To repeat the descriptive fixture timing from `backend`, run:
 
 ```sh

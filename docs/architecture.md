@@ -82,6 +82,5 @@ The accepted decisions are expanded in [ADR-001](adr/0001-modular-architecture.m
 AI assistance was used to draft code and documentation. The architecture above
 was checked against the repository's current modules, Compose configuration,
 and automated checks. The release verification record reports which checks
-actually ran and which require an available Docker engine or live upstream;
-it should be read as the evidence for this release, not as a claim of
-independent human review.
+actually ran and the limits of the measurements; it should be read as the
+evidence for this release, not as a claim of independent human review.

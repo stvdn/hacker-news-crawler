@@ -188,7 +188,7 @@ Keep one repository and an executable `main`. Use short feature branches, cohere
 - [x] Stage 5 — PostgreSQL migration, repository, migration service, startup readiness gates, and integration tests using the existing database service.
 - [x] Stage 6 — Next.js interface using pnpm, Tailwind CSS v4, and shadcn/ui; frontend container, integrated Compose startup, and browser tests. Moved ahead of caching.
 - [x] Stage 7 — Cache wrapper, configurable TTL, deterministic expiration/concurrency tests, and verification that cache hits persist separate usage events.
-- [ ] Stage 8 — Clean-clone verification, measurements, complete architecture documentation, and release tag `v1.0.0`.
+- [x] Stage 8 — Clean-clone verification, measurements, complete architecture documentation, and release tag `v1.0.0`.
 
 At each stage, review the diff, run relevant checks, update actual setup instructions, and merge only a working increment. Multiple meaningful commits per stage are expected.
 
