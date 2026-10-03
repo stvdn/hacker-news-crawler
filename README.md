@@ -4,7 +4,7 @@ Browse the first 30 Hacker News stories in three views, filtered by title length
 and ordered by points or comments. A full-stack interview project with a Next.js
 interface, a FastAPI HTML scraper, and PostgreSQL usage recording.
 
-**[Try the live demo](http://hn-crawler-zkiluj-3f7b6d-178-104-142-145.traefik.me/?filter=short)** — deployed with **Dokploy**.
+**[Try the live demo](http://hn-crawler-zkiluj-3f7b6d-178-104-142-145.traefik.me/)** — deployed with **Dokploy**.
 
 ![Live short-title view with original ranks and stories ordered by points](docs/images/live-demo.jpg)
 
