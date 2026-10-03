@@ -1,6 +1,6 @@
 # Hacker News Crawler
 
-An interview project for scraping and filtering the first 30 Hacker News front-page entries and recording API usage. This repository provides a Next.js interface, the FastAPI entries endpoint, filtering service, HTML scraper, and durable PostgreSQL usage recording with Alembic migrations. Planned functionality is tracked in [the implementation plan](docs/implementation-plan.md).
+An interview project for scraping and filtering the first 30 Hacker News front-page entries and recording API usage. This repository provides a Next.js interface, the FastAPI entries endpoint, filtering service, HTML scraper, and durable PostgreSQL usage recording with Alembic migrations. See the [implementation plan](docs/implementation-plan.md) and [architecture](docs/architecture.md).
 
 ## Requirements
 
@@ -310,4 +310,29 @@ remain at the test root.
 
 The [architecture decision](docs/adr/0001-modular-architecture.md) explains these
 boundaries, and the [implementation plan](docs/implementation-plan.md#stack-and-architecture)
-shows the complete directory layout, including future components.
+shows the complete directory layout.
+
+## Release verification
+
+To repeat the descriptive fixture timing from `backend`, run:
+
+```sh
+uv run --locked python -m scripts.benchmark_release --fixture-samples 200
+```
+
+To measure the full API, restart one API process with the default positive cache
+TTL, then add
+`--api-url http://127.0.0.1:8000 --warm-samples 8`. This makes one live Hacker
+News request, then eight cached API requests. Each API request still writes a
+usage event. The script requires a newly started API process and fails if the
+first response is already cached.
+
+## Known limitations
+
+The scraper depends on Hacker News HTML and fails a whole snapshot when required
+story fields are missing. The cache is process-local, expires after 60 seconds
+by default, and does not serve stale data after refresh failure. The page does
+not link to stories because the API exposes titles but not story URLs. Usage
+events count API requests, not distinct people. The delivered Compose setup is
+for running the application locally; this repository does not define a cloud
+deployment.

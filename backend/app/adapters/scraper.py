@@ -15,7 +15,7 @@ from app.domain.models import Entry, EntrySnapshot
 
 # Fixed by the project requirements; this parser supports Hacker News HTML only.
 SOURCE_URL = "https://news.ycombinator.com/"
-USER_AGENT = "hacker-news-crawler/0.1 (HTML front-page reader)"
+USER_AGENT = "hacker-news-crawler/1.0 (HTML front-page reader)"
 TIMEOUT = httpx.Timeout(connect=5, read=10, write=5, pool=5)
 
 

@@ -31,6 +31,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await engine.dispose()
 
 
-app = FastAPI(title="Hacker News Crawler API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Hacker News Crawler API", version="1.0.0", lifespan=lifespan)
 app.include_router(router)
 configure_error_handling(app)
