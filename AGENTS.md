@@ -1,6 +1,6 @@
 # Agent working agreement
 
-Use the repository's code, configuration, README, and implementation plan for project facts. Keep this file about how to work; do not copy the current architecture, commands, versions, or roadmap into it.
+Use the repository's code, configuration, README, and documentation in `docs/` for project facts. Keep this file about how to work; do not copy the current architecture, commands, versions, or roadmap into it.
 
 ## Scope
 

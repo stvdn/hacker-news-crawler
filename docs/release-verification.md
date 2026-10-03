@@ -3,8 +3,10 @@
 Verified on 2026-10-03. The release candidate was commit `dc5ec28`, checked
 out into a clean directory before these checks. An earlier clean HTTPS clone
 of `main` at `468fbc8` also passed the pre-release checks. The repository is
-public and its HTTPS clone succeeded. No cloud deployment is part of this
-release; Docker Compose is the documented local runtime.
+public and its HTTPS clone succeeded. This verification covered the local Docker
+Compose runtime. The current public demo is deployed with Dokploy and linked in
+the [README](../README.md#deployment-and-limitations); the results below describe
+the original local checks, not a validation of the remote infrastructure.
 
 ## Environment and procedure
 
