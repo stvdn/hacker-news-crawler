@@ -24,6 +24,7 @@ from app.service import EntryService
 def configured_database(monkeypatch: pytest.MonkeyPatch) -> None:
     # Engine construction needs a URL; fake recorders never connect to this database.
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://unused@localhost/unused")
+    monkeypatch.setenv("CACHE_TTL_SECONDS", "60")
 
 
 @pytest.fixture
@@ -170,9 +171,11 @@ def test_concurrent_requests_have_independent_contexts_and_events(
 
 
 @pytest.mark.usefixtures("configured_database")
+@pytest.mark.parametrize("ttl", ["60", "0"])
 def test_lifespan_assembles_scraper_and_closes_shared_client(
-    monkeypatch: pytest.MonkeyPatch, recorder: FakeRecorder
+    monkeypatch: pytest.MonkeyPatch, recorder: FakeRecorder, ttl: str
 ) -> None:
+    monkeypatch.setenv("CACHE_TTL_SECONDS", ttl)
     html = (Path(__file__).parents[1] / "fixtures" / "front_page.html").read_text(
         encoding="utf-8"
     )
@@ -186,13 +189,27 @@ def test_lifespan_assembles_scraper_and_closes_shared_client(
     monkeypatch.setattr("app.main.httpx.AsyncClient", lambda: upstream_client)
     monkeypatch.setattr("app.main.PostgresUsageRepository", lambda sessions: recorder)
     with TestClient(app) as client:
-        for _ in range(2):
-            response = client.get("/api/v1/entries")
+        for index, selected in enumerate(("all", "long", "short")):
+            response = client.get(f"/api/v1/entries?filter={selected}")
             assert response.status_code == 200
             assert response.json()["source_count"] == 30
-            assert response.json()["cache_hit"] is False
+            assert response.json()["cache_hit"] is (ttl != "0" and index > 0)
         assert not upstream_client.is_closed
     assert upstream_client.is_closed
-    assert len(requests) == 2
-    assert len(recorder.events) == 2
+    assert len(requests) == (1 if ttl != "0" else 3)
+    assert len(recorder.events) == 3
+    assert len({event.request_id for event in recorder.events}) == 3
+    assert [event.cache_hit for event in recorder.events] == (
+        [False, True, True] if ttl != "0" else [False, False, False]
+    )
     assert all(event.outcome == "success" for event in recorder.events)
+
+
+@pytest.mark.usefixtures("configured_database")
+def test_invalid_cache_configuration_stops_startup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CACHE_TTL_SECONDS", "nan")
+    with pytest.raises(ValueError, match="CACHE_TTL_SECONDS"):
+        with TestClient(app):
+            pass

@@ -183,3 +183,57 @@ def test_database_write_failure_returns_safe_503(
     assert response.json()["request_id"] == response.headers["X-Request-ID"]
     log = next(record for record in caplog.records if record.name == "app.api.errors")
     assert json.loads(log.message)["error_type"] == "PersistenceError"
+
+
+def test_cached_requests_each_commit_their_own_usage_event(
+    migrated_database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CACHE_TTL_SECONDS", "60")
+    html = (Path(__file__).parents[1] / "fixtures/front_page.html").read_text(
+        encoding="utf-8"
+    )
+    fetches = 0
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        nonlocal fetches
+        fetches += 1
+        return httpx.Response(200, text=html)
+
+    upstream = httpx.AsyncClient(transport=httpx.MockTransport(respond))
+    monkeypatch.setattr("app.main.httpx.AsyncClient", lambda: upstream)
+    with TestClient(app) as client:
+        responses = [
+            client.get(f"/api/v1/entries?filter={selected}")
+            for selected in ("all", "long", "short")
+        ]
+        assert all(response.status_code == 200 for response in responses)
+        assert fetches == 1
+        assert [response.json()["cache_hit"] for response in responses] == [
+            False,
+            True,
+            True,
+        ]
+        assert len({response.json()["fetched_at"] for response in responses}) == 1
+
+        async def verify() -> None:
+            engine = create_async_engine(migrated_database)
+            try:
+                async with engine.connect() as connection:
+                    rows = (
+                        (await connection.execute(select(usage_events)))
+                        .mappings()
+                        .all()
+                    )
+                assert len(rows) == 3
+                by_id = {str(row["request_id"]): row for row in rows}
+                for response in responses:
+                    body = response.json()
+                    row = by_id[body["request_id"]]
+                    assert row["outcome"] == "success"
+                    assert row["filter"] == body["filter"]
+                    assert row["cache_hit"] == body["cache_hit"]
+                    assert row["result_count"] == body["result_count"]
+            finally:
+                await engine.dispose()
+
+        asyncio.run(verify())

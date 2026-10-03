@@ -1,6 +1,6 @@
 # ADR-003: Reuse complete snapshots with bounded freshness
 
-- Status: Proposed
+- Status: Accepted — implemented in Stage 7
 - Date: 2026-10-01
 
 ## Context
@@ -18,6 +18,11 @@ Use a monotonic clock for expiration, measured from the completion of a successf
 Do not cache errors or partial results. If the snapshot has expired and refresh fails, return the error rather than silently serving expired data. Subsequent requests may retry refresh under the same lock; sharing a failed result among them is not guaranteed.
 
 Expose `fetched_at` in UTC. Record each request even when it does not cause a download. The initial deployment uses one API process.
+
+`CachedEntrySource` wraps the scraper at application startup. It checks for a
+complete 30-entry snapshot, returns a separate immutable snapshot with per-request
+hit metadata, and starts expiry after a successful fetch. Zero TTL bypasses cache
+reuse and the refresh lock. Invalid, negative, or non-finite TTL values stop startup.
 
 ## Alternatives considered
 

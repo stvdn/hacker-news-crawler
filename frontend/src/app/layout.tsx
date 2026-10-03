@@ -24,7 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </header>
           {children}
           <footer className="page-footer">
-            <p>Each view fetches a fresh snapshot. Stories and scores can change between views.</p>
+            <p>Views may share a recent snapshot. Check the fetch time; stories and scores can change after a refresh.</p>
             <details className="view-guide">
               <summary>How these views work</summary>
               <div className="guide-content">

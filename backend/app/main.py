@@ -7,6 +7,7 @@ import httpx
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.adapters.cache import CachedEntrySource, cache_ttl_seconds
 from app.adapters.database import database_url
 from app.adapters.scraper import HackerNewsScraper
 from app.adapters.usage import PostgresUsageRepository
@@ -17,11 +18,12 @@ from app.service import EntryService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    ttl_seconds = cache_ttl_seconds()
     engine = create_async_engine(database_url(), pool_pre_ping=True)
     try:
         async with httpx.AsyncClient() as client:
             app.state.entry_service = EntryService(
-                HackerNewsScraper(client),
+                CachedEntrySource(HackerNewsScraper(client), ttl_seconds=ttl_seconds),
                 PostgresUsageRepository(async_sessionmaker(engine)),
             )
             yield
