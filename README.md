@@ -1,13 +1,17 @@
 # Hacker News Crawler
 
-An interview project for scraping and filtering the first 30 Hacker News front-page entries and recording API usage. This repository provides the FastAPI entries endpoint, filtering service, HTML scraper, and durable PostgreSQL usage recording with Alembic migrations. Planned functionality is tracked in [the implementation plan](docs/implementation-plan.md).
+An interview project for scraping and filtering the first 30 Hacker News front-page entries and recording API usage. This repository provides a Next.js interface, the FastAPI entries endpoint, filtering service, HTML scraper, and durable PostgreSQL usage recording with Alembic migrations. Planned functionality is tracked in [the implementation plan](docs/implementation-plan.md).
 
 ## Requirements
 
 - Docker with Compose for the containerized stack.
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) for native backend development. uv installs the pinned Python 3.13 interpreter when needed.
+- Node.js 24 and pnpm 10.28.1 for native frontend development.
 
 The project uses Python 3.13 and uv 0.12.21. Dependencies are resolved in `backend/uv.lock`.
+The frontend uses Next.js 16, React 19, Tailwind CSS v4, and shadcn/ui;
+dependencies are resolved in `frontend/pnpm-lock.yaml`. Enable pnpm through
+`corepack enable` if needed; `frontend/package.json` pins its version.
 
 ## Run with Docker
 
@@ -19,11 +23,17 @@ Then run:
 docker compose up --build
 ```
 
-Open <http://127.0.0.1:8000/health>. The response is `{"status":"ok"}`. This endpoint confirms that the API process is responding; it does not test database readiness. PostgreSQL has a separate Compose health check. Its data persists in the named `postgres_data` volume.
+Open <http://127.0.0.1:3000> for the three story views. The API is available at
+<http://127.0.0.1:8000/docs>. Both <http://127.0.0.1:8000/health> and
+<http://127.0.0.1:3000/health> return `{"status":"ok"}` without fetching stories.
+These endpoints confirm their process is responding; they do not test database
+readiness. PostgreSQL has a separate Compose health check. Its data persists in
+the named `postgres_data` volume.
 
 Compose waits for PostgreSQL to become healthy, runs the one-shot `migrate`
 service (`alembic upgrade head`), then starts the API only if migrations succeed.
-The migration container exiting with code 0 is expected. Application and migration
+The web service waits for API health before starting. The migration container
+exiting with code 0 is expected. Application and migration
 containers run as a non-root user.
 
 Compose requires explicit database names, users, and passwords from `.env` or the
@@ -89,7 +99,60 @@ from `backend`, and review the generated `upgrade()` and `downgrade()` before
 applying and committing the revision. Autogeneration creates candidate revisions;
 it does not regenerate `env.py`.
 
+## Run the frontend locally
+
+Start the API as described above, then use another terminal:
+
+```sh
+cd frontend
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Open <http://127.0.0.1:3000>. Native development defaults to
+`API_BASE_URL=http://127.0.0.1:8000`; override it in `frontend/.env.local` if
+needed. This is a server-only setting, never a `NEXT_PUBLIC_` variable. Compose
+sets `API_BASE_URL=http://api:8000` and exposes the page on `WEB_PORT` (default
+3000). The root `.env` configures Compose and is not loaded by native Next.js.
+
 ## Checks
+
+### Frontend
+
+From `frontend`, run:
+
+```sh
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
+
+Run `uv sync --locked` in `backend` first and make `uv` available on PATH.
+Playwright starts a production Next.js server on port 3100 and a test-only
+FastAPI server on port 8100, so those ports must be free. It checks desktop and
+mobile views, five/six-word boundaries, sorting, null/zero metrics, loading,
+empty/error/retry states, keyboard navigation, and one API event per selection
+without hover prefetching. The test server uses the real service and filters
+with synthetic entries and an in-memory recorder; it never contacts Hacker News
+or PostgreSQL. Database persistence is covered separately by backend integration
+tests. CI runs frontend checks and uploads browser traces on failure.
+
+The frontend renders API results without implementing business filtering. Plain
+navigation links disable prefetching and fetch on every selection, including the
+active filter. Server requests use `cache: "no-store"`; no frontend data cache
+is used. Counts and UTC fetch times describe each response. Titles are plain
+text because the API does not supply story URLs. Usage counts API requests,
+not unique human actions; reloads also record requests. Invalid filter URLs show
+a recovery message without making an entries request. Web health checks do not
+generate usage events.
+
+shadcn/ui components live in `frontend/src/components/ui`, with aliases in
+`frontend/components.json`. Tailwind v4 uses `@tailwindcss/postcss` and CSS theme
+tokens in `frontend/src/app/globals.css`; there is no Tailwind v3 config file.
+
+### Backend
 
 From `backend`:
 
@@ -140,8 +203,8 @@ The scraper reads the first 30 Hacker News front-page entries, including hiring
 posts, and preserves their original ranks. `discuss` means zero comments;
 unavailable metrics become `null`. Invalid or incomplete pages fail instead of
 returning partial results. A shared HTTPX client is created at application startup
-and closed at shutdown. Each valid entries request currently fetches a new page;
-caching is planned for Stage 6.
+and closed at shutdown. Each valid entries request fetches a new page;
+caching is planned for Stage 7.
 
 See [Checks](#checks) for fixture tests and the optional live smoke check, and the
 [implementation plan](docs/implementation-plan.md#api-and-business-rules) for
@@ -192,7 +255,7 @@ recording raises an error, 503 takes precedence over the original result/error,
 with a structured diagnostic log and no retry.
 
 Persistence failures appear in `docker compose logs api` or the native API console.
-The web interface is planned for Stage 7.
+The web interface was added in Stage 6. Snapshot caching is planned for Stage 7.
 
 ## Entry rules
 

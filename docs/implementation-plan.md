@@ -10,7 +10,7 @@ Repository name: `hacker-news-crawler`. A Python import package, if needed, uses
 
 ## Stack and architecture
 
-- Frontend: Next.js App Router and TypeScript.
+- Frontend: Next.js App Router, TypeScript, Tailwind CSS v4, shadcn/ui, and pnpm.
 - Backend: FastAPI, Pydantic, HTTPX, Beautiful Soup using the built-in HTML parser.
 - Storage: PostgreSQL, SQLAlchemy async sessions, asyncpg, and Alembic migrations.
 - Cache: process memory with a configurable 60-second TTL.
@@ -28,7 +28,7 @@ Next.js -> FastAPI routes -> EntryService
                               `-- PostgresUsageRepository -> PostgreSQL
 ```
 
-Repository structure (cache and frontend are added in later stages):
+Repository structure (cache is added in Stage 7):
 
 ```text
 backend/
@@ -156,7 +156,7 @@ Introduce Docker in stage 1 and evolve it alongside the application:
 1. Add the backend Dockerfile, Compose services for the API and PostgreSQL, `.dockerignore`, and `.env.example`. Expose a minimal `GET /health` endpoint that confirms the API process is running; it does not check database readiness. Configure PostgreSQL's own health check and a named data volume.
 2. Develop FastAPI and Next.js locally with automatic reload by default, using PostgreSQL in Docker. Document the different database hostnames for local execution and the Compose network. Keep the containerized backend runnable as dependencies are added.
 3. Add the database repository, schema migration, migration service, and startup dependency gates in stage 5. Starting PostgreSQL early establishes the environment without bringing persistence implementation into stage 1.
-4. Add the Next.js Dockerfile and web service in stage 7. Run the available Compose stack at each integration milestone and the complete stack once the frontend exists.
+4. Add the Next.js Dockerfile and web service in stage 6. Run the available Compose stack at each integration milestone and the complete stack once the frontend exists.
 
 Stage 1 is complete when a reviewer can start the API and PostgreSQL with `docker compose up --build`, reach `GET /health`, and run the initial automated checks using the documented commands.
 
@@ -186,8 +186,8 @@ Keep one repository and an executable `main`. Use short feature branches, cohere
 - [x] Stage 3 — Scraper and saved HTML fixtures, including failure cases.
 - [x] Stage 4 — Service, entries HTTP endpoint, dependency assembly, and tests; verify the existing API container with the new dependencies. Uses an explicit logging-only usage recorder until Stage 5; successful responses do not yet imply durable persistence.
 - [x] Stage 5 — PostgreSQL migration, repository, migration service, startup readiness gates, and integration tests using the existing database service.
-- [ ] Stage 6 — Cache wrapper and deterministic expiration/concurrency tests.
-- [ ] Stage 7 — Next.js interface, frontend container, integrated Compose startup, and browser tests.
+- [x] Stage 6 — Next.js interface using pnpm, Tailwind CSS v4, and shadcn/ui; frontend container, integrated Compose startup, and browser tests. Moved ahead of caching.
+- [ ] Stage 7 — Cache wrapper and deterministic expiration/concurrency tests. Deferred until after the interface.
 - [ ] Stage 8 — Clean-clone verification, measurements, complete architecture documentation, and release tag `v1.0.0`.
 
 At each stage, review the diff, run relevant checks, update actual setup instructions, and merge only a working increment. Multiple meaningful commits per stage are expected.

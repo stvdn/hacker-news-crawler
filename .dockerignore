@@ -2,6 +2,8 @@
 .github
 .env
 .env.*
+**/.env
+**/.env.*
 **/.venv
 **/__pycache__
 **/.pytest_cache
@@ -10,3 +12,9 @@
 **/*.pyc
 backend/tests
 docs
+**/node_modules
+**/.next
+**/*.tsbuildinfo
+**/playwright-report
+**/test-results
+frontend/tests
