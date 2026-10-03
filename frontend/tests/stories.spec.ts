@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
-
-const api = "http://127.0.0.1:8100";
+import { testApiUrl as api } from "../test-config";
 
 test.beforeEach(async ({ request }) => {
   await request.post(`${api}/__test/scenario`, { data: {} });

@@ -7,7 +7,13 @@ export const filters = {
 } as const;
 
 export type EntryFilter = keyof typeof filters;
-export type Entry = { number: number; title: string; points: number | null; comments: number | null };
+export type Entry = {
+  number: number;
+  title: string;
+  points?: number;
+  comments?: number;
+};
+
 export type Entries = {
   request_id: string;
   fetched_at: string;
@@ -17,10 +23,29 @@ export type Entries = {
   result_count: number;
   entries: Entry[];
 };
+
+type EntryPayload = Omit<Entry, "points" | "comments"> & {
+  points?: unknown;
+  comments?: unknown;
+};
+
+type EntriesPayload = Omit<Entries, "entries"> & {
+  entries: EntryPayload[];
+};
+
 export type EntriesResult = { data: Entries; error?: never } | {
   data?: never;
   error: { message: string; requestId?: string };
 };
+
+function optionalMetric(value: unknown): number | undefined {
+  // JSON uses null for unavailable metrics; frontend models use undefined.
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error("Invalid entry metric");
+  }
+  return value;
+}
 
 export function isFilter(value: unknown): value is EntryFilter {
   return value === "all" || value === "long" || value === "short";
@@ -50,13 +75,20 @@ export async function fetchEntries(filter: EntryFilter): Promise<EntriesResult> 
         requestId: requestId && /^[\da-f-]{36}$/i.test(requestId) ? requestId : undefined,
       } };
     }
-    const data: Entries = await response.json();
+    const data: EntriesPayload = await response.json();
     // Fail safely if a proxy or incompatible API returns a different payload.
     if (!Array.isArray(data.entries) || data.filter !== filter ||
         !Number.isFinite(Date.parse(data.fetched_at))) {
       throw new Error("Invalid entries response");
     }
-    return { data };
+    return { data: {
+      ...data,
+      entries: data.entries.map((entry) => ({
+        ...entry,
+        points: optionalMetric(entry.points),
+        comments: optionalMetric(entry.comments),
+      })),
+    } };
   } catch {
     return { error: { message: "The stories service could not be reached. Please try again shortly." } };
   }

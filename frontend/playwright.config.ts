@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { testApiPort, testApiUrl, testWebPort, testWebUrl } from "./test-config";
 
 export default defineConfig({
   testDir: "./tests",
@@ -8,7 +9,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: "list",
   use: {
-    baseURL: "http://127.0.0.1:3100",
+    baseURL: testWebUrl,
     trace: "retain-on-failure",
   },
   projects: [
@@ -17,15 +18,15 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "uv run --locked uvicorn tests.browser_app:app --host 127.0.0.1 --port 8100",
+      command: `uv run --locked uvicorn tests.browser_app:app --host 127.0.0.1 --port ${testApiPort}`,
       cwd: "../backend",
-      url: "http://127.0.0.1:8100/health",
+      url: `${testApiUrl}/health`,
       reuseExistingServer: false,
     },
     {
-      command: "pnpm start --port 3100",
-      url: "http://127.0.0.1:3100/health",
-      env: { API_BASE_URL: "http://127.0.0.1:8100", NEXT_TELEMETRY_DISABLED: "1" },
+      command: `pnpm start --port ${testWebPort}`,
+      url: `${testWebUrl}/health`,
+      env: { API_BASE_URL: testApiUrl, NEXT_TELEMETRY_DISABLED: "1" },
       reuseExistingServer: false,
     },
   ],
