@@ -66,11 +66,14 @@ for (const [status, message] of [
 }
 
 test("loading, empty results, and invalid URLs", async ({ page, request }) => {
-  await request.post(`${api}/__test/scenario`, { data: { delay: 2, empty: true } });
+  await request.post(`${api}/__test/scenario`, { data: { delay: 2, all_long_titles: true } });
   await page.goto("/?filter=short", { waitUntil: "commit" });
   await expect(page.getByRole("status")).toContainText("Loading stories");
   await expect(page.getByRole("heading", { name: "No matching stories" })).toBeVisible();
-  await expect(page.getByText("0 of 0 stories")).toBeVisible();
+  await expect(page.getByText("0 of 30 stories")).toBeVisible();
+  const [event] = await (await request.get(`${api}/__test/events`)).json();
+  expect(event.filter).toBe("short");
+  expect(event.result_count).toBe(0);
   await request.post(`${api}/__test/scenario`, { data: {} });
   for (const query of ["invalid", "all&filter=short"]) {
     await page.goto(`/?filter=${query}`);
