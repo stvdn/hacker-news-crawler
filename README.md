@@ -203,12 +203,42 @@ The scraper reads the first 30 Hacker News front-page entries, including hiring
 posts, and preserves their original ranks. `discuss` means zero comments;
 unavailable metrics become `null`. Invalid or incomplete pages fail instead of
 returning partial results. A shared HTTPX client is created at application startup
-and closed at shutdown. Each valid entries request fetches a new page;
-caching is planned for Stage 7.
+and closed at shutdown. The API reuses a complete snapshot for up to 60 seconds
+by default; every valid request still filters and records its own usage event.
 
 See [Checks](#checks) for fixture tests and the optional live smoke check, and the
 [implementation plan](docs/implementation-plan.md#api-and-business-rules) for
 detailed scraping requirements.
+
+## Snapshot caching
+
+`CACHE_TTL_SECONDS` defaults to `60`. Set it in the root `.env` for Compose, or
+as an environment variable before starting a native API process. Use `0` to
+disable reuse and fetch on every request. Fractional seconds are accepted;
+blank, negative, nonnumeric, and non-finite values stop API startup. After changing
+the Compose setting, run `docker compose up -d api` to recreate the API if needed.
+
+The cache stores the complete immutable set of 30 entries; each request applies
+its own filter. Expiry uses a monotonic clock starting when extraction finishes.
+Hits do not extend the lifetime. Concurrent misses share the first successful
+refresh through an async lock. Failed refreshes and incomplete results are never
+cached, and expired stories are not returned when a refresh fails. Waiting
+requests can try another refresh, one at a time; failures are not shared or retried
+automatically within a request.
+
+Every valid request still records usage before responding, including cache hits.
+The response's `cache_hit` describes that request, while `fetched_at` remains the
+time of the original extraction. Different views can share a snapshot within its
+lifetime; a selection after expiry can show different stories. Next.js continues
+to make an uncached API request for every selection.
+
+The cache is scoped to one API process and is cleared on restart. Compose runs
+one worker; additional workers would each maintain their own cache. A shared
+cache such as Redis is a future option, not part of this deployment.
+
+Tests use fake clocks and controlled async gates for expiry, concurrent success
+and failure, cancellation, disabled caching, and independent filters. API and
+PostgreSQL integration tests verify separate usage events for hits and misses.
 
 ## Available API
 
@@ -224,8 +254,9 @@ The response contains `request_id` (UUID), `fetched_at` (UTC), `cache_hit`,
 `filter`, `source_count`, `result_count`, and `entries`. Entries contain their
 original `number`, `title`, `points`, and `comments`; unavailable metrics are
 `null`. `source_count` is 30 for a successful scrape; `result_count` is the number
-remaining after filtering. `cache_hit` is currently always false in the running
-application. Interactive API documentation is at <http://127.0.0.1:8000/docs>.
+remaining after filtering. `cache_hit` is false for a fetch and true when a request
+reuses a fresh snapshot. A hit preserves the original `fetched_at`.
+Interactive API documentation is at <http://127.0.0.1:8000/docs>.
 
 Errors contain `request_id` and a safe `detail` message. The `X-Request-ID` response
 header matches the body ID. Invalid filters return 422, upstream timeouts 504,
@@ -255,7 +286,7 @@ recording raises an error, 503 takes precedence over the original result/error,
 with a structured diagnostic log and no retry.
 
 Persistence failures appear in `docker compose logs api` or the native API console.
-The web interface was added in Stage 6. Snapshot caching is planned for Stage 7.
+The web interface was added in Stage 6 and the snapshot cache in Stage 7.
 
 ## Entry rules
 

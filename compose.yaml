@@ -33,7 +33,9 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    environment: *database_environment
+    environment:
+      <<: *database_environment
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS-60}
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:

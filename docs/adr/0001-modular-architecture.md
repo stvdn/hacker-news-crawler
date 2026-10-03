@@ -15,7 +15,7 @@ Use a lightweight ports-and-adapters package structure:
 
 - `app/api/`: endpoints in `routes.py`, Pydantic schemas in `schemas.py`, and request context middleware/error responses in `errors.py`.
 - `app/domain/`: immutable models, pure filters, port contracts, and shared exceptions.
-- `app/adapters/`: HTML scraping and usage recording; the cache wrapper joins in Stage 7.
+- `app/adapters/`: HTML scraping, snapshot caching, and usage recording.
 - `app/service.py`: orchestration through the domain contracts.
 - `app/main.py`: application lifespan and dependency assembly.
 
