@@ -4,6 +4,25 @@ This application shows the first 30 Hacker News front-page stories in three
 views and records each valid API request in PostgreSQL. The Next.js page is a
 consumer of the FastAPI endpoint; filtering and ordering happen in the backend.
 
+## Container design (before coding)
+
+This C4 container diagram is the design artifact prepared before coding. It
+shows the planned application boundaries and external dependencies. The
+[Structurizr DSL](architecture.dsl) is its editable source, and the image below
+is the [exported SVG](containers.svg).
+
+![C4 container diagram of the Hacker News Crawler](containers.svg)
+
+The web application calls the API from the Next.js server. The snapshot cache
+is in the API process; PostgreSQL stores usage events in a persistent Compose
+volume. The migration runner is a one-shot service that must finish before the
+API starts.
+
+## Implemented workflow
+
+The following view traces the current code's request path inside those
+containers, including the process-local cache and usage recording.
+
 ```mermaid
 flowchart LR
     Browser --> Web[Next.js page]
